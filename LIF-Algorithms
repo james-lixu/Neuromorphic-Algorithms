@@ -1,0 +1,131 @@
+import numpy as np
+import nengo
+import matplotlib.pyplot as plt
+from nengo.utils.matplotlib import rasterplot
+from nengo.dists import Uniform
+from nengo.dists import Choice
+from nengo.utils.ensemble import tuning_curves
+from nengo.processes import Piecewise
+
+#Rectified linear and NEF's LIF neurons
+n_RL  = nengo.neurons.RectifiedLinear()
+n_LIF = nengo.neurons.LIFRate(tau_rc=0.02, tau_ref=0.002)
+
+J = np.linspace(-1,10,100)
+
+plt.plot(J, n_RL.rates(J, gain=10, bias=0))
+plt.xlabel('I')
+plt.ylabel('$a$ (Hz)');
+plt.show()
+
+plt.plot(J, n_LIF.rates(J, gain=1, bias=0)) 
+plt.xlabel('I')
+plt.ylabel('a (Hz)'); 
+plt.show()
+
+# LIF neuron response to a sinusoidal input
+model = nengo.Network(label='One Neuron')
+
+with model:
+    
+    stimulus = nengo.Node(lambda t: np.sin(10*t))
+    ens = nengo.Ensemble(1, dimensions=1, 
+                         encoders = [[1]],
+                         intercepts = [0.5],
+                         max_rates= [100])
+    
+    nengo.Connection(stimulus, ens)
+    
+    spikes_p = nengo.Probe(ens.neurons, 'output')
+    voltage_p = nengo.Probe(ens.neurons, 'voltage')
+    stim_p = nengo.Probe(stimulus)
+
+sim = nengo.Simulator(model)
+sim.run(1)
+
+t = sim.trange()     
+plt.figure(figsize=(10,4))
+plt.plot(t, sim.data[stim_p], label='stimulus', color='r', linewidth=4)
+plt.ax = plt.gca()
+plt.ax.plot(t, sim.data[voltage_p],'g', label='v')
+plt.ylim((-1,2))
+plt.ylabel('Voltage')
+plt.xlabel("Time")
+plt.legend(loc='lower left')
+
+rasterplot(t, sim.data[spikes_p], ax=plt.ax.twinx(), use_eventplot=True)
+plt.ylim((-1,2))
+plt.show()
+
+#Two LIF neurons with the same intercept (0.5) and  op-posing encoders
+model = nengo.Network(label='Two Neurons')
+
+with model:
+    stim = nengo.Node(lambda t: np.sin(10*t))
+    ens = nengo.Ensemble(2, dimensions=1,
+                         encoders = [[1],[-1]],
+                         intercepts = [-.5, -.5],
+                         max_rates= [100, 100])
+    nengo.Connection(stim, ens)
+   
+    stim_p = nengo.Probe(stim)
+    spikes_p = nengo.Probe(ens.neurons, 'output')
+    
+   
+sim = nengo.Simulator(model)
+sim.run(.6)
+
+plt.plot(*tuning_curves(ens, sim))
+plt.xlabel('I')
+plt.ylabel('$a$ (Hz)');
+
+t = sim.trange()
+plt.figure(figsize=(12, 6))
+plt.plot(t, sim.data[stim_p],'r', linewidth=4)
+plt.ax = plt.gca()
+plt.ylabel("Output")
+plt.xlabel("Time")
+rasterplot(t, sim.data[spikes_p], ax=plt.ax.twinx(), use_eventplot=True)
+plt.ylabel("Neuron")
+plt.show()
+
+#50 LIF neurons with uniformly distributed maximal spiking rates and randomized intercepts.
+import numpy as np
+import nengo
+from nengo.utils.matplotlib import rasterplot
+from nengo.dists import Uniform
+
+model = nengo.Network(label='Decoding Neurons')
+
+N = 50 
+
+with model:
+    stim = nengo.Node(lambda t: np.sin(10*t))
+    ens = nengo.Ensemble(N, dimensions=1,
+                         max_rates=Uniform(100,200))
+    
+    nengo.Connection(stim, ens)
+   
+    stim_p = nengo.Probe(stim)
+    spikes_p = nengo.Probe(ens.neurons, 'output')
+   
+sim = nengo.Simulator(model)
+sim.run(.6)
+
+x = sim.data[stim_p][:,0]
+A = sim.data[spikes_p]
+
+plt.plot(*tuning_curves(ens,sim))
+plt.xlabel('I')
+plt.ylabel('$a$ (Hz)');
+plt.show()
+
+t = sim.trange()
+plt.figure(figsize=(12, 6))
+plt.ax = plt.gca()
+plt.plot(t, sim.data[stim_p],'r', linewidth=4)
+plt.ylabel("Output")
+plt.xlabel("Time");
+rasterplot(t, sim.data[spikes_p], ax=plt.ax.twinx(), use_eventplot=True, color='k')
+plt.ylabel("Neuron");
+plt.show()
