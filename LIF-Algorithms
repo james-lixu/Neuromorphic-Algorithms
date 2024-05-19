@@ -78,6 +78,7 @@ sim.run(.6)
 plt.plot(*tuning_curves(ens, sim))
 plt.xlabel('I')
 plt.ylabel('$a$ (Hz)');
+plt.show()
 
 t = sim.trange()
 plt.figure(figsize=(12, 6))
@@ -87,6 +88,40 @@ plt.ylabel("Output")
 plt.xlabel("Time")
 rasterplot(t, sim.data[spikes_p], ax=plt.ax.twinx(), use_eventplot=True)
 plt.ylabel("Neuron")
+plt.show()
+
+model = nengo.Network(label='Decoding Neurons')
+
+with model:
+    stim = nengo.Node(lambda t: np.sin(10*t))
+    ens = nengo.Ensemble(2, dimensions=1,
+                         encoders = [[1],[-1]],
+                         intercepts = [-.5, -.5],
+                         max_rates = [100, 100])
+    
+    nengo.Connection(stim, ens)
+   
+    stim_p = nengo.Probe(stim)
+    spikes_p = nengo.Probe(ens.neurons, 'output')
+   
+sim = nengo.Simulator(model)
+sim.run(.6)
+
+t = sim.trange()
+x = sim.data[stim_p][:,0]
+A = sim.data[spikes_p]
+
+gamma=np.dot(A.T,A)
+upsilon=np.dot(A.T,x)
+d = np.dot(np.linalg.pinv(gamma),upsilon)
+
+xhat = np.dot(A, d)
+
+plt.figure(figsize=(8,4))
+plt.plot(t, x, label='Stimulus', color='r', linewidth=4)
+plt.plot(t, xhat, label='Decoded stimulus')
+plt.ylabel('$x$')
+plt.xlabel('Time')
 plt.show()
 
 #50 LIF neurons with uniformly distributed maximal spiking rates and randomized intercepts.
@@ -128,4 +163,42 @@ plt.ylabel("Output")
 plt.xlabel("Time");
 rasterplot(t, sim.data[spikes_p], ax=plt.ax.twinx(), use_eventplot=True, color='k')
 plt.ylabel("Neuron");
+plt.show()
+
+model = nengo.Network(label='Decoding Neurons')
+
+N = 50 
+
+with model:
+    stim = nengo.Node(lambda t: np.sin(10*t))
+    ens = nengo.Ensemble(N, dimensions=1,
+                         max_rates=Uniform(100,200))
+    temp = nengo.Ensemble(10, dimensions=1)
+    
+    nengo.Connection(stim, ens)
+    connection = nengo.Connection(ens, temp) #This is just to generate the decoders
+   
+    stim_p = nengo.Probe(stim)
+    spikes_p = nengo.Probe(ens.neurons, 'output')
+   
+sim = nengo.Simulator(model)
+sim.run(.6)
+
+x = sim.data[stim_p][:,0]
+
+A = sim.data[spikes_p]
+
+gamma=np.dot(A.T,A)
+upsilon=np.dot(A.T,x)
+d = np.dot(np.linalg.pinv(gamma),upsilon)
+
+xhat = np.dot(A, d)
+
+t = sim.trange()
+plt.figure(figsize=(12, 6))
+plt.ax = plt.gca()
+plt.plot(t, sim.data[stim_p],'r', linewidth=4)
+plt.plot(t, xhat)
+plt.ylabel("x")
+plt.xlabel("Time")
 plt.show()
